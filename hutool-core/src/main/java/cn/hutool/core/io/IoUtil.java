@@ -422,6 +422,18 @@ public class IoUtil {
 	// -------------------------------------------------------------------------------------- read start
 
 	/**
+	 * 从流中读取UTF8编码的内容
+	 *
+	 * @param in 输入流
+	 * @return 内容
+	 * @throws IORuntimeException IO异常
+	 * @since 5.4.4
+	 */
+	public static String readUtf8(InputStream in) throws IORuntimeException {
+		return read(in, CharsetUtil.CHARSET_UTF_8);
+	}
+
+	/**
 	 * 从流中读取内容
 	 *
 	 * @param in          输入流
@@ -488,13 +500,25 @@ public class IoUtil {
 	}
 
 	/**
-	 * 从Reader中读取String，读取完毕后并不关闭Reader
+	 * 从Reader中读取String，读取完毕后关闭Reader
 	 *
 	 * @param reader Reader
 	 * @return String
 	 * @throws IORuntimeException IO异常
 	 */
 	public static String read(Reader reader) throws IORuntimeException {
+		return read(reader, true);
+	}
+
+	/**
+	 * 从{@link Reader}中读取String
+	 *
+	 * @param reader {@link Reader}
+	 * @param isClose 是否关闭{@link Reader}
+	 * @return String
+	 * @throws IORuntimeException IO异常
+	 */
+	public static String read(Reader reader, boolean isClose) throws IORuntimeException {
 		final StringBuilder builder = StrUtil.builder();
 		final CharBuffer buffer = CharBuffer.allocate(DEFAULT_BUFFER_SIZE);
 		try {
@@ -503,6 +527,10 @@ public class IoUtil {
 			}
 		} catch (IOException e) {
 			throw new IORuntimeException(e);
+		} finally{
+			if(isClose){
+				IoUtil.close(reader);
+			}
 		}
 		return builder.toString();
 	}
@@ -601,7 +629,7 @@ public class IoUtil {
 			throw new IORuntimeException(e);
 		}
 		if (readLength > 0 && readLength < length) {
-			byte[] b2 = new byte[length];
+			byte[] b2 = new byte[readLength];
 			System.arraycopy(b, 0, b2, 0, readLength);
 			return b2;
 		} else {
@@ -1240,5 +1268,18 @@ public class IoUtil {
 			IoUtil.close(in);
 		}
 		return checksum;
+	}
+
+	/**
+	 * 计算流的校验码，计算后关闭流
+	 *
+	 * @param in       流
+	 * @param checksum {@link Checksum}
+	 * @return Checksum
+	 * @throws IORuntimeException IO异常
+	 * @since 5.4.0
+	 */
+	public static long checksumValue(InputStream in, Checksum checksum) {
+		return checksum(in, checksum).getValue();
 	}
 }

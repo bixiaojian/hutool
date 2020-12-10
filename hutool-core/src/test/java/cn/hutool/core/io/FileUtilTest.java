@@ -70,7 +70,13 @@ public class FileUtilTest {
 	@Test
 	@Ignore
 	public void renameTest() {
-		FileUtil.rename(FileUtil.file("hutool.jpg"), "b.png", false, false);
+		FileUtil.rename(FileUtil.file("d:/test/3.jpg"), "2.jpg", false);
+	}
+
+	@Test
+	@Ignore
+	public void renameTest2() {
+		FileUtil.move(FileUtil.file("d:/test/a"), FileUtil.file("d:/test/b"), false);
 	}
 
 	@Test
@@ -273,7 +279,7 @@ public class FileUtilTest {
 			Console.log(file.getPath());
 		}
 	}
-	
+
 	@Test
 	@Ignore
 	public void loopFilesWithDepthTest() {
@@ -370,5 +376,12 @@ public class FileUtilTest {
 	public void getMimeTypeTest() {
 		String mimeType = FileUtil.getMimeType("test2Write.jpg");
 		Assert.assertEquals("image/jpeg", mimeType);
+	}
+
+	@Test
+	public void isSubTest() {
+		File file = new File("d:/test");
+		File file2 = new File("d:/test2/aaa");
+		Assert.assertFalse(FileUtil.isSub(file, file2));
 	}
 }

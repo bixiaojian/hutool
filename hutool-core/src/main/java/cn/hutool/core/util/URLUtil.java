@@ -14,7 +14,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.JarURLConnection;
 import java.net.MalformedURLException;
@@ -28,7 +27,16 @@ import java.util.Map;
 import java.util.jar.JarFile;
 
 /**
- * 统一资源定位符相关工具类
+ * URL（Uniform Resource Locator）统一资源定位符相关工具类
+ *
+ * <p>
+ * 统一资源定位符，描述了一台特定服务器上某资源的特定位置。
+ * </p>
+ * URL组成：
+ * <pre>
+ *   协议://主机名[:端口]/ 路径/[:参数] [?查询]#Fragment
+ *   protocol :// hostname[:port] / path / [:parameters][?query]#fragment
+ * </pre>
  *
  * @author xiaoleilu
  */
@@ -124,6 +132,18 @@ public class URLUtil {
 				throw new UtilException(e);
 			}
 		}
+	}
+
+	/**
+	 * 获取string协议的URL，类似于string:///xxxxx
+	 *
+	 * @param content 正文
+	 * @return URL
+	 * @since 5.5.2
+	 */
+	public static URI getStringURI(CharSequence content){
+		final String contentStr = StrUtil.addPrefixIfNot(content, "string:///");
+		return URI.create(contentStr);
 	}
 
 	/**
@@ -322,11 +342,8 @@ public class URLUtil {
 		if (null == charset) {
 			return url;
 		}
-		try {
-			return java.net.URLEncoder.encode(url, charset.toString());
-		} catch (UnsupportedEncodingException e) {
-			throw new UtilException(e);
-		}
+
+		return URLEncoder.ALL.encode(url, charset);
 	}
 
 	/**
@@ -478,13 +495,7 @@ public class URLUtil {
 	 * @throws UtilException 包装URISyntaxException
 	 */
 	public static String getPath(String uriStr) {
-		URI uri;
-		try {
-			uri = new URI(uriStr);
-		} catch (URISyntaxException e) {
-			throw new UtilException(e);
-		}
-		return uri.getPath();
+		return toURI(uriStr).getPath();
 	}
 
 	/**
@@ -504,7 +515,7 @@ public class URLUtil {
 		String path = null;
 		try {
 			// URL对象的getPath方法对于包含中文或空格的问题
-			path = URLUtil.toURI(url).getPath();
+			path = toURI(url).getPath();
 		} catch (UtilException e) {
 			// ignore
 		}
@@ -564,7 +575,7 @@ public class URLUtil {
 			location = encode(location);
 		}
 		try {
-			return new URI(location);
+			return new URI(StrUtil.trim(location));
 		} catch (URISyntaxException e) {
 			throw new UtilException(e);
 		}
@@ -708,7 +719,9 @@ public class URLUtil {
 			//noinspection ConstantConditions
 			body = body.replaceAll("^[\\\\/]+", StrUtil.EMPTY);
 			// 替换多个\或/为单个/
-			body = body.replace("\\", "/").replaceAll("//+", "/");
+			body = body.replace("\\", "/");
+			//issue#I25MZL，双斜杠在URL中是允许存在的，不做替换
+			//.replaceAll("//+", "/");
 		}
 
 		final int pathSepIndex = StrUtil.indexOf(body, '/');
@@ -749,11 +762,11 @@ public class URLUtil {
 	 * @throws IORuntimeException IO异常
 	 * @since 5.3.4
 	 */
-	public static long getContentLength(URL url) throws IORuntimeException{
-		if(null == url){
+	public static long getContentLength(URL url) throws IORuntimeException {
+		if (null == url) {
 			return -1;
 		}
-		
+
 		URLConnection conn = null;
 		try {
 			conn = url.openConnection();
@@ -762,8 +775,80 @@ public class URLUtil {
 			throw new IORuntimeException(e);
 		} finally {
 			if (conn instanceof HttpURLConnection) {
-				((HttpURLConnection)conn).disconnect();
+				((HttpURLConnection) conn).disconnect();
 			}
 		}
+	}
+
+	/**
+	 * Data URI Scheme封装，数据格式为Base64。data URI scheme 允许我们使用内联（inline-code）的方式在网页中包含数据，<br>
+	 * 目的是将一些小的数据，直接嵌入到网页中，从而不用再从外部文件载入。常用于将图片嵌入网页。
+	 *
+	 * <p>
+	 * Data URI的格式规范：
+	 * <pre>
+	 *     data:[&lt;mime type&gt;][;charset=&lt;charset&gt;][;&lt;encoding&gt;],&lt;encoded data&gt;
+	 * </pre>
+	 *
+	 * @param mimeType 可选项（null表示无），数据类型（image/png、text/plain等）
+	 * @param data     编码后的数据
+	 * @return Data URI字符串
+	 * @since 5.3.11
+	 */
+	public static String getDataUriBase64(String mimeType, String data) {
+		return getDataUri(mimeType, null, "base64", data);
+	}
+
+	/**
+	 * Data URI Scheme封装。data URI scheme 允许我们使用内联（inline-code）的方式在网页中包含数据，<br>
+	 * 目的是将一些小的数据，直接嵌入到网页中，从而不用再从外部文件载入。常用于将图片嵌入网页。
+	 *
+	 * <p>
+	 * Data URI的格式规范：
+	 * <pre>
+	 *     data:[&lt;mime type&gt;][;charset=&lt;charset&gt;][;&lt;encoding&gt;],&lt;encoded data&gt;
+	 * </pre>
+	 *
+	 * @param mimeType 可选项（null表示无），数据类型（image/png、text/plain等）
+	 * @param encoding 数据编码方式（US-ASCII，BASE64等）
+	 * @param data     编码后的数据
+	 * @return Data URI字符串
+	 * @since 5.3.6
+	 */
+	public static String getDataUri(String mimeType, String encoding, String data) {
+		return getDataUri(mimeType, null, encoding, data);
+	}
+
+	/**
+	 * Data URI Scheme封装。data URI scheme 允许我们使用内联（inline-code）的方式在网页中包含数据，<br>
+	 * 目的是将一些小的数据，直接嵌入到网页中，从而不用再从外部文件载入。常用于将图片嵌入网页。
+	 *
+	 * <p>
+	 * Data URI的格式规范：
+	 * <pre>
+	 *     data:[&lt;mime type&gt;][;charset=&lt;charset&gt;][;&lt;encoding&gt;],&lt;encoded data&gt;
+	 * </pre>
+	 *
+	 * @param mimeType 可选项（null表示无），数据类型（image/png、text/plain等）
+	 * @param charset  可选项（null表示无），源文本的字符集编码方式
+	 * @param encoding 数据编码方式（US-ASCII，BASE64等）
+	 * @param data     编码后的数据
+	 * @return Data URI字符串
+	 * @since 5.3.6
+	 */
+	public static String getDataUri(String mimeType, Charset charset, String encoding, String data) {
+		final StringBuilder builder = StrUtil.builder("data:");
+		if (StrUtil.isNotBlank(mimeType)) {
+			builder.append(mimeType);
+		}
+		if (null != charset) {
+			builder.append(";charset=").append(charset.name());
+		}
+		if (StrUtil.isNotBlank(encoding)) {
+			builder.append(';').append(encoding);
+		}
+		builder.append(',').append(data);
+
+		return builder.toString();
 	}
 }
